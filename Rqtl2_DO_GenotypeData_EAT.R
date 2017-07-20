@@ -28,12 +28,12 @@ library(qtl2scan)
 #####################
 # 
 setwd("C:/Users/etrujillo/Desktop/DOProjectFolder")
-load('Attie_DO_genoprobs.Rdata')
-load('GM_snps.Rdata')
+load('Attie_DO_genoprobs.Rdata') # Rdata file provided by Dan Gatti
+load('GM_snps.Rdata') # Rdata file provided by Dan Gatti
 load('qtl_LiverLipid_20170711.RData') # Qtl output for Liver Data
-load('genoprobs_subsetmarkers_DO_DanGattie_20170713.rData') # qtl2-style data structure with correct number of markers ()
-load('kinshipMatrix_DO_DanGattie_20170713.rData')
-load('genoProbs_withcorrectMouseandMarkers_DO_20170713.rData')
+load('genoprobs_subsetmarkers_DO_DanGattie_20170713.rData') # qtl2-style data structure with correct number of markers (120789)
+load('kinshipMatrix_DO_DanGattie_20170713.rData') # kinship Matrix generated
+load('genoProbs_withcorrectMouseandMarkers_DO_20170713.rData') #
 Liver_Lip <- read.csv(file = "DO_Liver_Lip_norm_log2.csv") # Phenotype data
 covar <- read.csv(file = "DOWave1through4_Covariates.csv")
 
@@ -104,10 +104,10 @@ rowsKeep <- which(MouseNames %in% LiverLip_Mice) # identify which mice are prese
 
 overWriteGenoProbs <- genoprobs # create a new genoprobs object
 
-for(i in names(genoprobs))
-  { 
-  overWriteGenoProbs[[i]] <- overWriteGenoProbs[[i]][rowsKeep,,]
-}
+  for(i in names(genoprobs))
+    { 
+      overWriteGenoProbs[[i]] <- overWriteGenoProbs[[i]][rowsKeep,,]
+    }
 save(overWriteGenoProbs, file =  "genoProbs_withcorrectMouseandMarkers_DO_20170713.rData") # save overWriteGenoProbs as rData object
 
 ######################
@@ -132,7 +132,7 @@ save(qtl, file =  "qtl_LiverLipid_20170711.rData")
 str(qtl)
 
 qtl = scan1(genoprobs = overWriteGenoProbs, pheno = Liver_Lip[,-c(1)],
-            kinship = K, addcovar = addcovar, cores = 2)
+            kinship = K, addcovar = addcovar, cores = 2) # add covariate
 
 ################
 # Plotting QTL #
@@ -155,22 +155,23 @@ map = map[order(as.numeric(names(map)))]
 # Overlaying plots for all lipids in Liver_Lipid file
 pdf("qtl_LiverLipids_plotloop.pdf", width = 14)
 plot(qtl, map, lodcolumn = 1, main = "QTL for Liver Lipids")
+  
 for(i in 2:ncol(qtl))
-  {
-  plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
-  }
-dev.off()
+    {
+      plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
+    }
+    dev.off()
 
 # Overlaying plots  for lipids 1:20
 
 pdf("qtl_LiverLipids_plot1through20.pdf", width = 14)
 plot(qtl, map, lodcolumn = 1)
-for(i in 2:20)
-{
-  plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
-  legend("topleft", col=palette, names(palette), ncol=2, lwd=2, bg="gray95")
-}
-dev.off()
+  for(i in 2:20)
+  {
+    plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
+    legend("topleft", col=palette, names(palette), ncol=2, lwd=2, bg="gray95")
+  }
+  dev.off()
 
 pdf("qtl_LiverLipids_plot_TG.56.6.pdf", width = 14)
 plot(qtl, map, lodcolumn = 366, col = "blue")
