@@ -26,15 +26,23 @@ library(qtl2scan)
 #####################
 # Load in the data. #
 #####################
-# 
+
+# Files provided by Dan Gatti
 setwd("C:/Users/etrujillo/Desktop/DOProjectFolder")
 load('Attie_DO_genoprobs.Rdata') # Rdata file provided by Dan Gatti
 load('GM_snps.Rdata') # Rdata file provided by Dan Gatti
-load('qtl_LiverLipid_20170711.RData') # Qtl output for Liver Data
-load('genoprobs_subsetmarkers_DO_DanGattie_20170713.rData') # qtl2-style data structure with correct number of markers (120789)
-load('kinshipMatrix_DO_DanGattie_20170713.rData') # kinship Matrix generated
-load('genoProbs_withcorrectMouseandMarkers_DO_20170713.rData') #
-Liver_Lip <- read.csv(file = "DO_Liver_Lip_norm_log2.csv") # Phenotype data
+
+# Output files from QTL analysis; this is specific for Liver Metabolites
+load('qtl_LiverMetabolites_20170824.rData') # Qtl output for Liver Data
+#load('qtl_LiverMetabolites_20170824_findpeaks.rData') #find peaks for Liver Data
+
+#Required for qtl parameters
+load('kinshipMatrix_DO_DanGattie_20170824.rData') # kinship Matrix generated
+load('genoprobs_subsetmarkers_DO_DanGattie_QTl2convert_20170824.rData') # qtl2-style data structure with correct number of markers (120789)
+load('genoProbs_withcorrectMouseandMarkers_DO_20170824.rData') # overwrite genoprobs with the correct number of mice and markers
+
+# Phenotype file and covariate file
+Liver_Metabolites <- read.csv(file = "RModified/21Aug2017DOLiverMetabolites_ComBatNormalized.csv") # Phenotype data
 covar <- read.csv(file = "DOWave1through4_Covariates.csv")
 
 #####################
@@ -47,6 +55,13 @@ str(GM_snps)
 rownames(probs) # print mice IDs
 row.names(GM_snps) #142,259 Markers
 
+row.names(Liver_Metabolites) <- Liver_Metabolites$Mouse.ID #set row names for phenotype file
+Liver_Metabolites <- Liver_Metabolites[,-c(2:6)] # remove covariate information from phenotype file, from Normalization step
+
+# Match the mice in phenotype file and covariate file
+LiverMetabolites_Mice <- row.names(Liver_Metabolites) # save mouse id's from phenotype data
+subSet.covar <- covar[covar$Mouse.ID %in% LiverMetabolites_Mice,] #120789 obs. of 16 variables
+
 #Psuedo wave of mice with AA prefix
 length(grep("AA", row.names(probs))) # 99 mice with AA prefix
 length(grep("f", row.names(probs))) # 49 are females
@@ -55,9 +70,9 @@ length(grep("m", row.names(probs))) # 50 are females
 #####################
 # Data Preparation. #
 #####################
-# access attributes from probs
+# access attributes from probs (loaded earlier)
 # create new object with dimnames
-# save markers
+# extract and save markers
 
 row.names(probs) <- correctName.probs <- c(substr(row.names(probs)[1:99],4,8),row.names(probs)[100:479]) # remove appended AA. and sex ID
 
@@ -66,11 +81,11 @@ x <- dimnames(probs)
 markers <- x[[3]] # 120789 markers used
 mice <- x[[1]] # 479 mice
 
-row.names(Liver_Lip) <- Liver_Lip[,1] # update phenotype row names
-
 ###################
 # Subset Markers. #
 ###################
+# Subset markers from total marker count 143259 to the the correct number 120789
+# Create a genetic map with marker, chromosome and position
 
 subSet.GM_snps <- GM_snps[GM_snps$marker %in% markers,] #120789 obs. of 16 variables
 
@@ -86,10 +101,10 @@ DOgmap <- subSet.GM_snps[,1:3] # subset the marker, chromosome, and position (bp
 
 genoprobs = qtl2convert::probs_doqtl_to_qtl2(probs = probs, map = subSet.GM_snps,  
               chr_column = "chr", pos_column = "pos", marker_column = "marker")
-save(genoprobs, file =  "genoprobs_subsetmarkers_DO_DanGattie_20170713.rData") # save genoprobs as rData object
+save(genoprobs, file =  "genoprobs_subsetmarkers_DO_DanGattie_QTl2convert_20170824.rData") # save genoprobs as rData object
 
 K = calc_kinship(probs = genoprobs, type = "loco")
-save(K, file =  "kinshipMatrix_DO_DanGattie_20170713.rData") # save K as rData object
+save(K, file =  "kinshipMatrix_DO_DanGattie_20170824.rData") # save K as rData object
 
 ################
 # Subset Mice. #
@@ -98,9 +113,9 @@ save(K, file =  "kinshipMatrix_DO_DanGattie_20170713.rData") # save K as rData o
 # Use for loop to subset the mice only present in phenotype data
 # array indexing [,,]
 
-LiverLip_Mice <- row.names(Liver_Lip) # save mouse id's from phenotype data
+
 MouseNames <- row.names(genoprobs[[1]]) # save mouse id's from genoprob data
-rowsKeep <- which(MouseNames %in% LiverLip_Mice) # identify which mice are present in both phenotype data and genoprob data
+rowsKeep <- which(MouseNames %in% Liver_Metabolites$Mouse.ID) # identify which mice are present in both phenotype data and genoprob data
 
 overWriteGenoProbs <- genoprobs # create a new genoprobs object
 
@@ -108,17 +123,17 @@ overWriteGenoProbs <- genoprobs # create a new genoprobs object
     { 
       overWriteGenoProbs[[i]] <- overWriteGenoProbs[[i]][rowsKeep,,]
     }
-save(overWriteGenoProbs, file =  "genoProbs_withcorrectMouseandMarkers_DO_20170713.rData") # save overWriteGenoProbs as rData object
+save(overWriteGenoProbs, file =  "genoProbs_withcorrectMouseandMarkers_DO_20170824.rData") # save overWriteGenoProbs as rData object
 
 ######################
 # Set up covariates. #
 ######################
 
-addcovar = model.matrix(~sex + Batch + wave, data = covar)[,-1] #create a matrix by expanding factors to a set of dummy variables
-row.names(addcovar) <- covar$mouseNumber
+addcovar = model.matrix(~sex + Batch + Wave, data = subSet.covar)[,-1] #create a matrix by expanding factors to a set of dummy variables
+row.names(addcovar) <- subSet.covar$Mouse.ID
 
-sex <- (covar$sex == "M")*1
-names(sex) <- covar$mouseNumber
+sex <- (subSet.covar$sex == "M")*1
+names(sex) <- subSet.covar$Mouse.ID
 
 #########
 # Scan1 #
@@ -127,13 +142,13 @@ names(sex) <- covar$mouseNumber
 # scan1() takes genotype probabilites, matrix of phenotypes (here Live rLipids)
 # need to add
 
-qtl = scan1(genoprobs = overWriteGenoProbs, pheno = Liver_Lip[,-c(1)] , kinship = K, cores = 3)
-save(qtl, file =  "qtl_LiverLipid_20170711.rData")
-str(qtl)
+#qtl = scan1(genoprobs = overWriteGenoProbs, pheno = Liver_Metabolites[,-c(1)] , kinship = K, cores = 1)
+#save(qtl, file =  "qtl_LiverLipid_20170824.rData")
+#str(qtl)
 
-qtl = scan1(genoprobs = overWriteGenoProbs, pheno = Liver_Lip[,-c(1)],
-            kinship = K, addcovar = addcovar, cores = 2) # add covariate
-
+qtl = scan1(genoprobs = overWriteGenoProbs, pheno = Liver_Metabolites[,-c(1)],
+            kinship = K, addcovar = addcovar, cores = 1) # add covariate
+save(qtl, file =  "qtl_LiverMetabolites_20170828.rData")
 ################
 # Plotting QTL #
 ################
@@ -153,7 +168,7 @@ map = map[order(as.numeric(names(map)))]
 # dev.off()
 
 # Overlaying plots for all lipids in Liver_Lipid file
-pdf("qtl_LiverLipids_plotloop.pdf", width = 14)
+pdf("Figures/qtl_LiverMetabolites_plotloop_20170824.pdf", width = 14)
 plot(qtl, map, lodcolumn = 1, main = "QTL for Liver Lipids")
   
 for(i in 2:ncol(qtl))
@@ -162,29 +177,32 @@ for(i in 2:ncol(qtl))
     }
     dev.off()
 
-# Overlaying plots  for lipids 1:20
-
-pdf("qtl_LiverLipids_plot1through20.pdf", width = 14)
-plot(qtl, map, lodcolumn = 1)
-  for(i in 2:20)
-  {
-    plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
-    legend("topleft", col=palette, names(palette), ncol=2, lwd=2, bg="gray95")
-  }
-  dev.off()
+# Overlaying plots  for lipids 1:i
+pdf("Figures/qtl_LiverMetabolites_plot1through20_20170824.pdf", width = 14)
+  plot(qtl, map, lodcolumn = 1)
+    for(i in 2:5)
+    {
+      plot(qtl, map, lodcolumn = i, col = i, add = TRUE)
+      #legend("topleft", legend = qtl , col=palette, names(palette), ncol=2, lwd=2, bg="gray95")
+    }
+dev.off()
 
 pdf("qtl_LiverLipids_plot_TG.56.6.pdf", width = 14)
 plot(qtl, map, lodcolumn = 366, col = "blue")
 legend("topleft", col="blue", lwd=2, bg="gray95")
 dev.off()
 
-
+legend("topright", inset=.05, title="Number of Cylinders",
+       legend =c("4","6","8"), fill=terrain.colors(3), horiz=TRUE)
+legend("bottomleft", legend = levels(batch), pch = 16, col = 1:length(levels(batch)),
+       x.intersp = 0.7, y.intersp = 0.7)
 #####################
 # Finding LOD Peaks #
 #####################
 # Function find_peaks() will identify a set of LOD peaks that exceed some threshold
 
 findPeaks <- find_peaks(qtl, map, threshold=4, drop=1.5)
+save(findpeaks, file =  "qtl_LiverMetabolites_20170824_findpeaks.rData")
 
 subSetLiver_Lip <- Liver_Lip[, 2] #subset only one phenotype
 names(subSetLiver_Lip)<- LiverLip_Mice # append names of mice to each measurement
